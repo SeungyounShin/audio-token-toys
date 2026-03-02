@@ -1,0 +1,58 @@
+# ── 50Hz conv → 2L causal transformer → projector → LLM (NO CTC) ──
+experiment_name: "llm_50hz_2L_no_ctc_unfreeze"
+
+# Frontend
+frontend_type: "raw"
+n_mels: 80
+patch_frames: 8
+hop_frames: 8
+
+# Audio Encoder — 2-layer causal transformer on 50Hz conv features
+d_model: 512
+n_heads: 8
+n_layers: 2
+d_ff: 2048
+max_seq_len: 2000
+dropout: 0.1
+causal: true
+
+# 50Hz features — skip 4x downsample
+use_50hz: true
+
+# NO CTC
+use_ctc: false
+ctc_weight: 0.0
+ctc_warmup_steps: 0
+
+# LLM (ALL layers unfrozen — full fine-tune)
+llm_model: "Qwen/Qwen3-0.6B"
+llm_dim: 1024
+max_text_len: 128
+unfreeze_llm_layers: 99
+
+# Separate LRs for different components
+encoder_lr: 3.0e-4
+projector_lr: 1.0e-3
+
+# Data (full LibriSpeech 960hrs)
+data_dir: "data/mels"
+train_split: "train.100+train.360+train.500"
+test_splits: ["test.clean", "test.other"]
+sr: 16000
+
+# Training — same as CTC version, 20K steps for comparison
+batch_size: 4
+grad_accum: 8
+lr: 1.0e-4
+warmup_steps: 1000
+total_steps: 20000
+weight_decay: 0.01
+max_grad_norm: 1.0
+mixed_precision: "bf16"
+
+# Checkpointing
+save_every: 20000
+eval_every: 10000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-token-toys-llm"
