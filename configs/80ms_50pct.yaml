@@ -1,0 +1,3 @@
+experiment_name: "80ms_50pct"
+patch_frames: 8
+hop_frames: 4    # 50% overlap

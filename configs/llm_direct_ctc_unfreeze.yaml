@@ -1,0 +1,58 @@
+# ── Direct path: conv(50Hz) → projector → LLM (no transformer) ──
+experiment_name: "llm_50hz_ctc_unfreeze"
+
+# Frontend
+frontend_type: "raw"
+n_mels: 80
+patch_frames: 8
+hop_frames: 8
+
+# Audio Encoder — NO transformer (n_layers=0), use 50Hz conv features directly
+d_model: 512
+n_heads: 8
+n_layers: 0
+d_ff: 2048
+max_seq_len: 2000
+dropout: 0.1
+causal: true
+
+# 50Hz features — skip 4x downsample for richer audio info (4x more tokens)
+use_50hz: true
+
+# CTC auxiliary loss at 50Hz conv features
+use_ctc: true
+ctc_weight: 0.3
+ctc_warmup_steps: 5000  # CTC-only for 5K steps, then joint training
+
+# LLM (ALL layers unfrozen — full fine-tune)
+llm_model: "Qwen/Qwen3-0.6B"
+llm_dim: 1024
+max_text_len: 128
+unfreeze_llm_layers: 99  # >= num_layers = unfreeze all
+
+# Separate LRs for different components
+encoder_lr: 3.0e-4   # conv+CTC: high for fast CTC convergence
+projector_lr: 1.0e-3  # moderate: LN gamma=0.03 grows slowly to prevent bf16 overflow
+
+# Data (full LibriSpeech 960hrs)
+data_dir: "data/mels"
+train_split: "train.100+train.360+train.500"
+test_splits: ["test.clean", "test.other"]
+sr: 16000
+
+# Training (full LLM fine-tune needs lower LR)
+batch_size: 4
+grad_accum: 8
+lr: 1.0e-4
+warmup_steps: 1000
+total_steps: 50000
+weight_decay: 0.01
+max_grad_norm: 1.0
+mixed_precision: "bf16"
+
+# Checkpointing
+save_every: 5000
+eval_every: 10000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-token-toys-llm"

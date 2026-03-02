@@ -1,0 +1,45 @@
+# ── LLM decoder config: Whisper-Large-sized encoder ──
+experiment_name: "llm_raw_large"
+
+# Frontend
+frontend_type: "raw"       # "raw" (waveform conv) or "mel" (precomputed mel patches)
+n_mels: 80                 # only used if frontend_type=mel
+patch_frames: 8            # only used if frontend_type=mel
+hop_frames: 8              # only used if frontend_type=mel
+
+# Audio Encoder (Whisper Large encoder scale)
+d_model: 1280
+n_heads: 20
+n_layers: 32
+d_ff: 5120
+max_seq_len: 500
+dropout: 0.1
+causal: true
+
+# LLM
+llm_model: "Qwen/Qwen3-0.6B"
+llm_dim: 1024
+max_text_len: 128
+
+# Data
+data_dir: "data/mels"      # only used if frontend_type=mel
+train_split: "train.100"
+test_splits: ["test.clean", "test.other"]
+sr: 16000
+
+# Training
+batch_size: 4
+grad_accum: 8
+lr: 3.0e-4
+warmup_steps: 500
+total_steps: 20000
+weight_decay: 0.01
+max_grad_norm: 1.0
+mixed_precision: "bf16"
+
+# Checkpointing
+save_every: 2000
+eval_every: 5000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-token-toys-llm"

@@ -1,0 +1,50 @@
+# ── Small encoder (4L) + CTC + LLM unfreeze: direct gradient path ──
+experiment_name: "llm_small_enc_ctc_unfreeze"
+
+# Frontend
+frontend_type: "raw"
+n_mels: 80
+patch_frames: 8
+hop_frames: 8
+
+# Audio Encoder (small transformer, rely on conv+CTC)
+d_model: 512
+n_heads: 8
+n_layers: 4
+d_ff: 2048
+max_seq_len: 500
+dropout: 0.1
+causal: true
+
+# CTC auxiliary loss at 50Hz conv features
+use_ctc: true
+ctc_weight: 0.3
+
+# LLM (first 4 layers unfrozen)
+llm_model: "Qwen/Qwen3-0.6B"
+llm_dim: 1024
+max_text_len: 128
+unfreeze_llm_layers: 4
+
+# Data (full LibriSpeech 960hrs)
+data_dir: "data/mels"
+train_split: "train.100+train.360+train.500"
+test_splits: ["test.clean", "test.other"]
+sr: 16000
+
+# Training
+batch_size: 16
+grad_accum: 2
+lr: 3.0e-4
+warmup_steps: 1000
+total_steps: 50000
+weight_decay: 0.01
+max_grad_norm: 1.0
+mixed_precision: "bf16"
+
+# Checkpointing
+save_every: 5000
+eval_every: 10000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-token-toys-llm"

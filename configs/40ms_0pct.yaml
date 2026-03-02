@@ -1,0 +1,3 @@
+experiment_name: "40ms_0pct"
+patch_frames: 4
+hop_frames: 4    # 0% overlap

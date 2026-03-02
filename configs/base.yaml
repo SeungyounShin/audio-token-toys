@@ -1,0 +1,40 @@
+# ── Base config (shared across all experiments) ──
+# Model
+n_mels: 80
+d_model: 512
+n_heads: 8
+n_layers: 6
+d_ff: 2048
+max_seq_len: 1500
+dropout: 0.1
+teacher_model: "openai/whisper-base"
+teacher_dim: 512
+
+# Data
+data_dir: "data/mels"
+train_split: "train.100"
+test_splits: ["test.clean", "test.other"]
+sr: 16000
+
+# Training
+batch_size: 32           # per GPU
+grad_accum: 1
+lr: 3.0e-4
+warmup_steps: 500
+total_steps: 10000
+weight_decay: 0.01
+max_grad_norm: 1.0
+mixed_precision: "bf16"
+
+# Checkpointing & logging
+save_every: 2000
+eval_every: 2000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-encoder-scaling"
+
+# Evaluation (linear probe)
+probe_lr: 1.0e-3
+probe_epochs: 20
+probe_batch_size: 64
+vocab_size: 29   # a-z + space + apostrophe + blank
