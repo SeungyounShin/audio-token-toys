@@ -48,6 +48,8 @@ def main():
     parser.add_argument("--base_config", default="configs/llm_base.yaml")
     parser.add_argument("--config", default=None, help="Experiment config override")
     parser.add_argument("--resume", default=None)
+    parser.add_argument("--resume_weights", default=None,
+                        help="Load model weights but reset optimizer/scheduler (for new data)")
     args = parser.parse_args()
 
     cfg = load_config(args.base_config, args.config)
@@ -81,8 +83,13 @@ def main():
 
     # ── Data ──
     if frontend_type == "raw":
-        from src.data.wav_dataset import LibriSpeechWavDataset, wav_collate_fn
-        train_ds = LibriSpeechWavDataset(split=cfg.train_split, sr=cfg.sr)
+        from src.data.wav_dataset import LibriSpeechWavDataset, MultiWavDataset, wav_collate_fn
+        if hasattr(cfg, "datasets") and cfg.datasets:
+            train_ds = MultiWavDataset(cfg.datasets, sr=cfg.sr)
+            if is_main:
+                print(f"  Multi-dataset: {len(cfg.datasets)} sources, {len(train_ds)} samples")
+        else:
+            train_ds = LibriSpeechWavDataset(split=cfg.train_split, sr=cfg.sr)
         collate = wav_collate_fn
     else:
         from src.data.dataset import LibriSpeechMelDataset, collate_fn
@@ -221,8 +228,19 @@ def main():
         scheduler.load_state_dict(ckpt["scheduler"])
         global_step = ckpt["step"]
         flops.cumulative = ckpt.get("cumulative_flops", 0)
+        if "llm_full" in ckpt and unfreeze_llm_layers > 0:
+            llm.load_state_dict(ckpt["llm_full"])
         if is_main:
             print(f"  Resumed from step {global_step}")
+    elif args.resume_weights:
+        # Load model weights only, reset optimizer/scheduler (for new data phase)
+        ckpt = torch.load(args.resume_weights, map_location="cpu", weights_only=False)
+        accelerator.unwrap_model(audio_encoder).load_state_dict(ckpt["model"])
+        if "llm_full" in ckpt and unfreeze_llm_layers > 0:
+            llm.load_state_dict(ckpt["llm_full"])
+        if is_main:
+            print(f"  Loaded weights from {args.resume_weights} (step {ckpt.get('step', '?')})")
+            print(f"  Optimizer/scheduler reset for new training phase")
 
     # ── Training loop ──
     log_history = []

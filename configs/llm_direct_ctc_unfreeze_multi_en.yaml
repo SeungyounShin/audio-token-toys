@@ -1,0 +1,81 @@
+# ── Baseline (n_layers=0) + English data scaling ──
+experiment_name: "llm_direct_ctc_multi_en"
+
+# Frontend
+frontend_type: "raw"
+n_mels: 80
+patch_frames: 8
+hop_frames: 8
+
+# Audio Encoder — NO transformer (n_layers=0), use 50Hz conv features directly
+d_model: 512
+n_heads: 8
+n_layers: 0
+d_ff: 2048
+max_seq_len: 2000
+dropout: 0.1
+causal: true
+
+# 50Hz features
+use_50hz: true
+
+# CTC auxiliary loss
+use_ctc: true
+ctc_weight: 0.3
+ctc_warmup_steps: 5000
+
+# LLM (ALL layers unfrozen — full fine-tune)
+llm_model: "Qwen/Qwen3-0.6B"
+llm_dim: 1024
+max_text_len: 128
+unfreeze_llm_layers: 99
+
+# Separate LRs
+encoder_lr: 3.0e-4
+projector_lr: 1.0e-3
+
+# Datasets: English only (~2500h+)
+datasets:
+  - name: "openslr/librispeech_asr"
+    split: "train.clean.100+train.clean.360+train.other.500"
+    text_col: "text"
+    max_dur: 20.0
+  - name: "sanchit-gandhi/tedlium-data"
+    split: "train"
+    text_col: "text"
+    max_dur: 20.0
+  - name: "facebook/voxpopuli"
+    config: "en"
+    split: "train"
+    text_col: "normalized_text"
+    max_dur: 20.0
+  - name: "MLCommons/peoples_speech"
+    config: "clean"
+    split: "train[:300000]"
+    text_col: "text"
+    max_dur: 20.0
+
+max_audio_duration: 20.0
+sr: 16000
+
+# Fallback
+data_dir: "data/mels"
+train_split: "train.100+train.360+train.500"
+test_splits: ["test.clean", "test.other"]
+
+# Training
+batch_size: 4
+grad_accum: 8
+lr: 1.0e-4
+warmup_steps: 1000
+total_steps: 100000
+weight_decay: 0.01
+max_grad_norm: 1.0
+mixed_precision: "bf16"
+
+# Checkpointing
+save_every: 10000
+eval_every: 10000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-token-toys-llm"

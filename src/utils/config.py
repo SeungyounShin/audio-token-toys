@@ -53,6 +53,8 @@ class Config:
     train_split: str = "train.100"
     test_splits: List[str] = field(default_factory=lambda: ["test.clean", "test.other"])
     sr: int = 16000
+    datasets: list = field(default_factory=list)  # multi-dataset config (list of dicts)
+    max_audio_duration: float = 20.0  # max utterance duration in seconds
 
     # Training
     batch_size: int = 32

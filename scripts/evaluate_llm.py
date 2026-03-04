@@ -44,7 +44,7 @@ def evaluate_split(audio_encoder, bridge, split_name, cfg, device):
         text_ref = batch["texts"][0]
 
         with torch.no_grad():
-            audio_features, n_tokens = audio_encoder(audio_input, n_lengths)
+            audio_features, n_tokens, _ = audio_encoder(audio_input, n_lengths)
             transcriptions = bridge.generate(
                 audio_features,
                 n_audio_tokens=n_tokens,

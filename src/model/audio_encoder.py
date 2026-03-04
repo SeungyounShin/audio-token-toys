@@ -79,6 +79,13 @@ class AudioEncoder(nn.Module):
             del self.frontend.proj
             del self.frontend.norm
 
+        # Project conv output to d_model when they differ (e.g. conv_dim=512, d_model=768)
+        self.conv_proj = (
+            nn.Linear(conv_dim, d_model)
+            if (use_50hz and frontend_type == "raw" and n_layers > 0 and conv_dim != d_model)
+            else None
+        )
+
         self.n_layers = n_layers
         if n_layers > 0:
             self.encoder = AudioTransformerEncoder(
@@ -134,6 +141,8 @@ class AudioEncoder(nn.Module):
             x = self.frontend.conv_stack(x)  # [B, conv_dim, T_50hz]
             self.frontend._conv50hz = x  # cache for CTC
             conv_out = x.transpose(1, 2)  # [B, T_50hz, conv_dim]
+            if self.conv_proj is not None:
+                conv_out = self.conv_proj(conv_out)  # [B, T_50hz, d_model]
             B, N, _ = conv_out.shape
 
             n_tokens = None
@@ -177,31 +186,36 @@ class AudioEncoder(nn.Module):
         # When n_layers=0, CTC on conv output (same as before).
         ctc_loss = None
         if self.use_ctc and texts is not None and self.frontend_type == "raw":
-            ctc_input = encoded.float()  # [B, T_50hz, d_model or conv_dim], fp32 for CTC
+            # Filter to samples with non-empty CTC targets (non-Latin scripts → empty targets)
+            valid_idx = [i for i, t in enumerate(texts) if len(text_to_ctc_targets(t)) > 0]
 
-            logits = self.ctc_head(ctc_input)  # [B, T_50hz, vocab]
-            log_probs = F.log_softmax(logits, dim=-1)
-            log_probs = log_probs.transpose(0, 1)  # [T_50hz, B, vocab]
+            if valid_idx:
+                valid_idx_t = torch.tensor(valid_idx, device=encoded.device)
+                ctc_input = encoded[valid_idx_t].float()  # [V, T_50hz, dim]
 
-            input_lengths = self.frontend.num_tokens_50hz(n_lengths)
-            input_lengths = input_lengths.clamp(max=ctc_input.shape[1])
+                logits = self.ctc_head(ctc_input)  # [V, T_50hz, vocab]
+                log_probs = F.log_softmax(logits, dim=-1).transpose(0, 1)  # [T, V, vocab]
 
-            targets = []
-            target_lengths = []
-            for t in texts:
-                ids = text_to_ctc_targets(t)
-                targets.extend(ids)
-                target_lengths.append(len(ids))
+                valid_lengths = n_lengths[valid_idx_t]
+                input_lengths = self.frontend.num_tokens_50hz(valid_lengths)
+                input_lengths = input_lengths.clamp(max=ctc_input.shape[1])
 
-            targets_t = torch.tensor(targets, dtype=torch.long, device=log_probs.device)
-            target_lengths_t = torch.tensor(
-                target_lengths, dtype=torch.long, device=log_probs.device
-            )
+                targets = []
+                target_lengths = []
+                for t in [texts[i] for i in valid_idx]:
+                    ids = text_to_ctc_targets(t)
+                    targets.extend(ids)
+                    target_lengths.append(len(ids))
 
-            ctc_loss = F.ctc_loss(
-                log_probs, targets_t, input_lengths, target_lengths_t,
-                blank=CTC_BLANK, zero_infinity=True,
-            )
+                targets_t = torch.tensor(targets, dtype=torch.long, device=log_probs.device)
+                target_lengths_t = torch.tensor(
+                    target_lengths, dtype=torch.long, device=log_probs.device
+                )
+
+                ctc_loss = F.ctc_loss(
+                    log_probs, targets_t, input_lengths, target_lengths_t,
+                    blank=CTC_BLANK, zero_infinity=True,
+                )
 
         return audio_features, n_tokens, ctc_loss
 
