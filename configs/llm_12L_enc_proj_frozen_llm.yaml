@@ -1,0 +1,79 @@
+# ── Encoder + Projector training, LLM fully frozen ──
+experiment_name: "llm_12L_enc_proj_frozen_llm"
+
+# Frontend
+frontend_type: "raw"
+n_mels: 80
+patch_frames: 8
+hop_frames: 8
+
+# Audio Encoder — 12L (resumed from Stage 2)
+d_model: 768
+n_heads: 12
+n_layers: 12
+d_ff: 3072
+max_seq_len: 2000
+dropout: 0.1
+causal: true
+use_50hz: true
+
+# No CTC
+use_ctc: false
+
+# Encoder + projector trainable
+freeze_encoder: false
+
+# LLM fully frozen
+llm_model: "Qwen/Qwen3-0.6B"
+llm_dim: 1024
+max_text_len: 128
+unfreeze_llm_layers: 0
+
+# LRs
+encoder_lr: 1.0e-4
+projector_lr: 3.0e-4
+lr: 0.0
+
+# Datasets: English only
+datasets:
+  - name: "openslr/librispeech_asr"
+    split: "train.clean.100+train.clean.360+train.other.500"
+    text_col: "text"
+    max_dur: 20.0
+  - name: "sanchit-gandhi/tedlium-data"
+    split: "train"
+    text_col: "text"
+    max_dur: 20.0
+  - name: "facebook/voxpopuli"
+    config: "en"
+    split: "train"
+    text_col: "normalized_text"
+    max_dur: 20.0
+  - name: "MLCommons/peoples_speech"
+    config: "clean"
+    split: "train[:300000]"
+    text_col: "text"
+    max_dur: 20.0
+
+max_audio_duration: 20.0
+sr: 16000
+
+data_dir: "data/mels"
+train_split: "train.100+train.360+train.500"
+test_splits: ["test.clean", "test.other"]
+
+# Training
+batch_size: 4
+grad_accum: 8
+warmup_steps: 1000
+total_steps: 50000
+weight_decay: 0.01
+max_grad_norm: 0.5
+mixed_precision: "bf16"
+
+# Checkpointing
+save_every: 10000
+eval_every: 10000
+log_every: 50
+output_dir: "outputs"
+wandb_project: "audio-token-toys-llm"

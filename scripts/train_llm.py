@@ -169,18 +169,23 @@ def main():
     # Separate LRs: encoder (conv+CTC), projector, LLM
     projector_lr = getattr(cfg, "projector_lr", 0.0) or cfg.lr
     encoder_lr = getattr(cfg, "encoder_lr", 0.0) or cfg.lr
+    freeze_encoder = getattr(cfg, "freeze_encoder", False)
+
     encoder_params = []
     projector_params = []
     for name, p in audio_encoder.named_parameters():
         if "projector" in name:
             projector_params.append(p)
+        elif freeze_encoder:
+            p.requires_grad = False
         else:
             encoder_params.append(p)
 
-    param_groups = [
-        {"params": encoder_params, "lr": encoder_lr},
-        {"params": projector_params, "lr": projector_lr},
-    ]
+    param_groups = []
+    if encoder_params:
+        param_groups.append({"params": encoder_params, "lr": encoder_lr})
+    if projector_params:
+        param_groups.append({"params": projector_params, "lr": projector_lr})
     if unfreeze_llm_layers > 0:
         param_groups.append(
             {"params": [p for p in llm.parameters() if p.requires_grad], "lr": cfg.lr}
@@ -189,6 +194,9 @@ def main():
     trainable_params = encoder_params + projector_params
     if unfreeze_llm_layers > 0:
         trainable_params += [p for p in llm.parameters() if p.requires_grad]
+
+    if is_main and freeze_encoder:
+        print(f"  Encoder FROZEN (projector only: {sum(p.numel() for p in projector_params)/1e6:.1f}M)")
 
     if is_main:
         print(f"  LR: encoder={encoder_lr}, projector={projector_lr}, LLM={cfg.lr}")
@@ -235,7 +243,7 @@ def main():
     elif args.resume_weights:
         # Load model weights only, reset optimizer/scheduler (for new data phase)
         ckpt = torch.load(args.resume_weights, map_location="cpu", weights_only=False)
-        accelerator.unwrap_model(audio_encoder).load_state_dict(ckpt["model"])
+        accelerator.unwrap_model(audio_encoder).load_state_dict(ckpt["model"], strict=False)
         if "llm_full" in ckpt and unfreeze_llm_layers > 0:
             llm.load_state_dict(ckpt["llm_full"])
         if is_main:

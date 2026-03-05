@@ -48,6 +48,9 @@ class Config:
     encoder_lr: float = 0.0   # conv + CTC head
     projector_lr: float = 0.0  # audio → LLM projector
 
+    # Staged training: freeze encoder (conv+transformer), train projector only
+    freeze_encoder: bool = False
+
     # Data
     data_dir: str = "data/mels"
     train_split: str = "train.100"
